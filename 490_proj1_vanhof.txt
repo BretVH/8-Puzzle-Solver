@@ -1,0 +1,368 @@
+
+(defparameter *counter1* 0 
+  "Counter to keep track of generated nodes")
+
+(defparameter *counter2* 0 
+  "Counter to keep track of expanded nodes")
+
+(defparameter init (make-array'(3 3):initial-contents'((1 2 3)(4 5 6)(7 8 0))))
+
+(defstruct node   
+ STATE  
+ PARENT    ini
+ ACTION   
+ G-VAL    
+ H-VAL     
+ F-VAL )
+
+(defun goalp(state) 
+      (let ((goal(make-array '(3 3):initial-contents'((1 2 3) (4 			5 6) (7 8 0)))))
+	(loop for I from 0 to 2 do
+	    (loop for K from 0 to 2 do
+		   (when(not(equal(aref (node-state state) I K)(aref goal I K)))
+                (return-from goalp nil)))))
+   			(return-from goalp T))
+		
+(defun A* (nodes goalp children-fn fvalue-fn)
+ (cond ((null nodes) nil)            
+ ;; Return the first node if it is a goal node.             
+ ((funcall goalp (first nodes))                      
+ ;; success! return it:                      
+ (funcall 'format t "Path Taken: ~S~%Total Cost of goal node: ~S~%Number of Nodes expanded: ~S~%Number of Nodes Generated: ~S~%Effective Branching factor: ~S~%Average Branching factor: ~S~%" (node-parent (first nodes))(node-g-val (first nodes)) *counter1* *counter2* (EXPT *counter1* (/ 1 (node-g-val (first nodes)))) (/ *counter1* *counter2*))(first nodes))
+ ;; Append the children to the set of old nodes             
+ (t  (A*(sort(append(funcall children-fn (first nodes))
+                       (rest nodes))               
+                #'< :key  fvalue-fn)      
+          goalp  children-fn  fvalue-fn))))
+
+(defun fvalue-mh (nodes)
+     (+(funcall 'manhattan-distance nodes) (node-g-val nodes)))
+
+(defun fvalue-mt (nodes)
+     (+(funcall 'num-misplaced-tiles nodes) (node-g-val nodes)))
+
+(defun fvalue-m0 (nodes)
+      (node-g-val nodes))
+
+(defun where-is-blank (state)
+   (loop for x from 0 to 2       
+      do (loop  for y from 0 to 2
+                when (zerop (aref state x y))
+                do (return-from where-is-blank (list x y)))))
+
+(defun copy-puzzle-state (state)
+   (let ((new-array (make-array '(3 3))))
+   	     (loop for x from 0 to 2
+                    do (loop for y from 0 to 2
+                              do (setf (aref new-array x y)
+               		      	       	     (aref state x y)))) 	    
+ 	              ;;return new-array
+                      new-array))  
+
+
+(defun left-child (state)
+    (let* ((blank-pos (where-is-blank state))
+              (left-pos (list  (first blank-pos) 
+			(- (second blank-pos) 1)))
+   )
+          (if (>=  (second left-pos) 0)
+    ;;ensure that going left doesn't make us go out of the board
+             (let ((left-state (copy-puzzle-state state)))
+        ;;shift the left tile into the blank-pos
+                   (setf (aref left-state (first blank-pos) (second blank-pos))
+                        (aref left-state (first left-pos)  (second left-pos))) 
+              ;;shift the blank into the left-tile position
+              (setf (aref left-state (first left-pos)  
+(second left-pos))
+ 	      	     0)
+              ;;return the action and state
+		(setf *counter2* (1+ *counter2*))
+             (list(list 'go-left left-state))))))
+
+(defun right-child (state)
+    (let* ((blank-pos (where-is-blank state))
+              (right-pos (list  (first blank-pos) (+ (second blank-pos) 1)))
+;;left position has the same row coordnate, but a different 
+   )
+          (if (<=  (second right-pos) 2)
+    ;;ensure that going left doesn't make us go out of the board
+             (let ((right-state (copy-puzzle-state state)))
+        ;;shift the left tile into the blank-pos
+                   (setf (aref right-state (first blank-pos) (second blank-pos))
+                       (aref right-state (first right-pos) (second right-pos))) 
+              ;;shift the blank into the left-tile position
+              (setf (aref right-state (first right-pos)  (second right-pos))
+ 	      	     0)
+              ;;return the action and state
+		(setf *counter2* (1+ *counter2*))
+             (list(list 'go-right right-state))))))
+
+(defun up-child (state)
+    (let* ((blank-pos (where-is-blank state))
+              (up-pos (list  (- (first blank-pos) 1) (second blank-pos)))
+;;left position has the same row coordnate, but a different column coordinate..
+   )
+          (if (>=  (first up-pos) 0)
+    ;;ensure that going left doesn't make us go out of the board
+             (let ((up-state (copy-puzzle-state state)))
+        ;;shift the left tile into the blank-pos
+                   (setf (aref up-state (first blank-pos) (second blank-pos))
+                        (aref up-state (first up-pos)  (second up-pos))) 
+              ;;shift the blank into the left-tile position
+              (setf (aref up-state (first up-pos)  (second up-pos))
+ 	      	     0)
+              ;;return the action and state
+		(setf *counter2* (1+ *counter2*))
+             (list(list 'go-up up-state))))))
+
+
+(defun down-child (state)
+    (let* ((blank-pos (where-is-blank state))
+              (down-pos (list  (+ (first blank-pos) 1) (second blank-pos)))
+   )
+          (if (<=  (first down-pos) 2)
+    ;;ensure that going left doesn't make us go out of the board
+             (let ((down-state (copy-puzzle-state state)))
+        ;;shift the left tile into the blank-pos
+                   (setf (aref down-state (first blank-pos) (second blank-pos))
+                        (aref down-state (first down-pos)  (second down-pos))) 
+              ;;shift the blank into the left-tile position
+              (setf (aref down-state (first down-pos)  (second down-pos))
+ 	      	     0)
+              ;;return the action and state
+		   (setf *counter2* (1+ *counter2*))
+             (list(list 'go-down down-state))))))
+
+(defun puzzle-equal (state1 state2)
+   (loop for x from 0 to 2
+       always (loop for y from 0 to 2
+    always (equal (aref state1 x y) (aref state2 x y))))) 
+
+(defun random-PERMUTE (list)
+   ;;takes a list and permutes the list randomly
+   (let ((l (copy-list list))
+  (ret nil))
+     (do ()
+  ((null l) ret)
+       (let ((i (random (length l))))
+  ;;picks a random element of the list, deletes it
+  ;;and pushes it into the newlist
+  (push (nth i l) ret)
+  (setf l (delete (nth i l) l))))))
+
+(defun  puzzle-children(state)
+   (setf *counter1* (1+ *counter1*))
+  (append (left-child state) (right-child state) (up-child state) (down-child state)))
+
+(defun puz-expand(myNode)
+		(loop for state in (funcall 
+	'puzzle-children(node-state myNode))
+			append(list(make-node :state (second state) :parent (append myNode ) :action (first state) :g-val (+(node-g-val myNode) 1)))))
+
+(defun random-puzzle-state
+ (distance &optional state &aux path cstate)
+ ;;geneate a state that is distance away from the given state
+ ;;if no goal tate is given we set it to the normal goal state config
+   (unless state
+      (setq state
+  (make-array '(3 3) :initial-contents '((1 2 3) (4 5 6) (7 8 0))))
+   (setq cstate state)
+   (push cstate path)
+   (loop for move from 1 to distance
+       do   (let ((children (mapcar #'second (puzzle-children cstate))))
+    ;;find a random child that is not on the path
+    ;; (otherwise you get loopy paths) 
+   (loop for child in (random-permute children)
+        thereis (if (not (member child path :test #'puzzle-equal))
+      (progn (setq cstate child)
+      (push cstate path))))))
+   (if (null cstate)
+       (random-puzzle-state state distance)
+     cstate)))
+   
+
+ 
+(defun Num-Misplaced-tiles(state)
+	(let ((tiles 0))
+     (let ((goal(make-array '(3 3):initial-contents'((1 2 3) (4 			5 6) (7 8 0)))))
+	(loop for I from 0 to 2 do
+            (loop for K from 0 to 2 do
+                 (if (equal (aref (node-state state) I K)(aref goal  I K))
+                          (setq tiles (+ tiles 0))
+                 (if(not(equal(aref(node-state state) I K) 0))
+                      (setq tiles (+ tiles 1))))))
+				tiles)))
+
+(defun Manhattan-distance(state) 
+	(let ((distance 0))
+(if(equal state nil)
+	     (+ distance 0))
+      (let ((goal(make-array '(3 3):initial-contents'((1 2 3) (4 5 6) (7 8 0)))))
+	(loop for I from 0 to 2 do
+	    (loop for K from 0 to 2 do
+		(if(equal (aref (node-state state) I K)(aref goal  0 0))
+			(setq distance (+ (+ distance I) K)))
+		(if(and(and(equal(aref (node-state state) I K)(aref goal 0 1))(equal I 0))(equal K 0))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 1))(equal I 0))(equal K 0))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 1))(equal I 0))(equal K 1)) 
+			(setq distance (+ distance 0)))
+                (if(and(and(equal(aref (node-state state)I K)(aref goal 0 1))(equal I 0))(equal K 2)) 
+			(setq distance (+ distance 1)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 0 1))(equal I 1))(equal K 0))
+			(setq distance (+ distance 2)))
+ 		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 1))(equal I 1))(equal K 1)) 
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 1))(equal I 1))(equal K 2)) 
+			(setq distance (+ distance 2)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 0 1))(equal I 2))(equal K 0))
+			(setq distance (+ distance 3)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 1))(equal I 2))(equal K 1)) 
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 1))(equal I 2))(equal K 2))
+			(setq distance (+ distance 3))) 
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 2))(equal I 0))(equal K 0))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 2))(equal I 0))(equal K 1))
+			(setq distance (+ distance 1)))
+                (if(and(and(equal(aref (node-state state)I K)(aref goal 0 2))(equal I 0))(equal K 2))
+			(setq distance (+ distance 0)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 0 2))(equal I 1))(equal K 0))
+			(setq distance (+ distance 3)))
+ 		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 2))(equal I 1))(equal K 1))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 2))(equal I 1))(equal K 2))
+			(setq distance (+ distance 1)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 0 2))(equal I 2))(equal K 0))
+			(setq distance (+ distance 4)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 2))(equal I 2))(equal K 1))
+			(setq distance (+ distance 3)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 0 2))(equal I 2))(equal K 2))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 0))(equal I 0))(equal K 0))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 0))(equal I 0))(equal K 1))
+			(setq distance  (+ distance 2)))
+                (if(and(and(equal(aref (node-state state)I K)(aref goal 1 0))(equal I 0))(equal K 2))
+			(setq distance (+ distance 3)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 1 0))(equal I 1))(equal K 0))
+			(setq distance (+ distance 0)))
+ 		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 0))(equal I 1))(equal K 1))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 0))(equal I 1))(equal K 2))
+			(setq distance (+ distance 2)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 1 0))(equal I 2))(equal K 0))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 0))(equal I 2))(equal K 1))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 0))(equal I 2))(equal K 2))
+			(setq distance (+ distance 3)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 1 1))(equal I 0))(equal K 0))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 1))(equal I 0))(equal K 1))
+			(setq distance (+ distance 1)))
+                (if(and(and(equal(aref (node-state state)I K)(aref goal 1 1))(equal I 0))(equal K 2))
+			(setq distance (+ distance 2)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 1 1))(equal I 1))(equal K 0))
+			(setq distance (+ distance 1)))
+ 		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 1))(equal I 1))(equal K 1))
+			(setq distance (+ distance 0)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 1))(equal I 1))(equal K 2))
+			(setq distance (+ distance 1)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 1 1))(equal I 2))(equal K 0))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 1))(equal I 2))(equal K 1))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 1))(equal I 2))(equal K 2))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 2))(equal I 0))(equal K 0))
+			(setq distance  (+(+ distance 2) 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 2))(equal I 0))(equal K 1))
+			(setq distance (+ distance 3)))
+                (if(and(and(equal(aref (node-state state)I K)(aref goal 1 2))(equal I 0))(equal K 2))
+			(setq distance (+ distance 2)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 1 2))(equal I 1))(equal K 0))
+			(setq distance (+ distance 2)))
+ 		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 2))(equal I 1))(equal K 1))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 2))(equal I 1))(equal K 2))
+			(setq distance (+ distance 0)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 1 2))(equal I 2))(equal K 0))
+			(setq distance (+ distance 3)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 2))(equal I 2))(equal K 1))
+			(setq distance (+(+ distance 1) 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 1 2))(equal I 2))(equal K 2))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 0))(equal K 0))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 0))(equal K 1))
+			(setq distance (+ distance 3)))
+                (if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 0))(equal K 2))
+			(setq distance (+ distance 4)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 1))(equal K 0))
+			(setq distance (+ distance 1)))
+ 		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 1))(equal K 1))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 1))(equal K 2))
+			(setq distance (+ distance 3)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 2))(equal K 0))
+			(setq distance (+ distance 0)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 2))(equal K 1))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 2))(equal K 2))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 0))(equal K 0))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 0))(equal K 1))
+			(setq distance (+ distance 3)))
+                (if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 0))(equal K 2))
+			(setq distance (+ distance 4)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 1))(equal K 0))
+			(setq distance (+ distance 1)))
+ 		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 1))(equal K 1))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 1))(equal K 2))
+			(setq distance (+ distance 3)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 2))(equal K 0))
+			(setq distance (+ distance 0)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 2))(equal K 1))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 2))(equal K 2))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 0))(equal K 0))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 0))(equal K 1))
+			(setq distance (+ distance 3)))
+                (if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 0))(equal K 2))
+			(setq distance (+ distance 4)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 1))(equal K 0))
+			(setq distance (+ distance 1)))
+ 		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 1))(equal K 1))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 1))(equal K 2))
+			(setq distance (+ distance 3)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 2))(equal K 0))
+			(setq distance (+ distance 0)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 2))(equal K 1))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 0))(equal I 2))(equal K 2))
+			(setq distance (+ distance 2)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 1))(equal I 0))(equal K 0))
+			(setq distance (+ distance 3)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 1))(equal I 0))(equal K 1))
+			(setq distance (+ distance 2)))
+                (if(and(and(equal(aref (node-state state)I K)(aref goal 2 1))(equal I 0))(equal K 2))
+			(setq distance (+ distance 3)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 2 1))(equal I 1))(equal K 0))
+			(setq distance (+ distance 2)))
+ 		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 1))(equal I 1))(equal K 1))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 1))(equal I 1))(equal K 2))
+			(setq distance (+ distance 2)))
+	        (if(and(and(equal(aref (node-state state)I K)(aref goal 2 1))(equal I 2))(equal K 0))
+			(setq distance (+ distance 1)))
+		(if(and(and(equal(aref (node-state state)I K)(aref goal 2 1))(equal I 2))(equal K 1))
+			(setq distance (+ distance 0)))
+		(if(aref (node-state state)I K)(aref goal 2 2))
+			(setq distance (+ distance 0)))))distance))
